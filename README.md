@@ -2,6 +2,14 @@
 
 Frontend de la tienda en línea (Partes A y B): catálogo, carrito y pago para clientes, y panel de administración y gobernanza para el personal. Resuelve la operación completa de una tienda (venta, inventario, compras, facturación y auditoría) desde una sola aplicación que corre en web, iOS y Android, y consume la API del repositorio `ecommerce-backend`.
 
+> **Repositorios del proyecto**
+>
+> | Parte | Repositorio | En local (Docker) |
+> |---|---|---|
+> | Frontend (este) | [Joguisam-gt/ecommerce-frontend](https://github.com/Joguisam-gt/ecommerce-frontend) | Tienda y panel: <http://localhost:8081> |
+> | Backend | [Joguisam-gt/ecommerce-backend](https://github.com/Joguisam-gt/ecommerce-backend) | API: <http://localhost:3000/api/v1> |
+> | Documentación de la API | Swagger UI ([guía en el backend](https://github.com/Joguisam-gt/ecommerce-backend#documentacion-interactiva-swagger)) | <http://localhost:8082> |
+
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![Expo](https://img.shields.io/badge/Expo-000020?style=for-the-badge&logo=expo&logoColor=white)
@@ -129,7 +137,7 @@ Al iniciar sesión con el superusuario se llega a Gobernanza, y el menú lateral
 
 El `Dockerfile` del repositorio compila la versión web (`npx expo export --platform web`) con `node:22-slim` y la sirve con `nginx:1.27-alpine`, que hace fallback a `index.html` para cualquier ruta desconocida (`nginx.conf`). El contenedor publica el puerto 80 (mapeado a 8081 en el equipo).
 
-El archivo `docker-compose.yml` que orquesta los tres servicios (MongoDB con replica set `rs0`, backend en el puerto 3000 con `CORS_ORIGINS=http://localhost:8081`, y este frontend en `8081->80`) está fuera de este repositorio, en la carpeta padre. Como `EXPO_PUBLIC_API_BASE_URL` se incrusta al compilar, se pasa como argumento de construcción (build arg), no como variable de ejecución.
+El archivo `docker-compose.yml` que orquesta los cuatro servicios (MongoDB con replica set `rs0`, [backend](https://github.com/Joguisam-gt/ecommerce-backend) en el puerto 3000 con `CORS_ORIGINS=http://localhost:8081,http://localhost:8082`, este frontend en `8081->80` y Swagger UI en `8082`) está fuera de este repositorio, en la carpeta padre que contiene ambos repositorios. Como `EXPO_PUBLIC_API_BASE_URL` se incrusta al compilar, se pasa como argumento de construcción (build arg), no como variable de ejecución.
 
 Para construir y ejecutar solo este contenedor:
 
@@ -141,6 +149,46 @@ docker run --rm -p 8081:80 ecommerce-frontend
 ```
 
 Accede siempre por `http://localhost:8081` (no por `127.0.0.1`) para que las cookies funcionen.
+
+## 7. Iniciar sesión y hacer una compra
+
+### Cuentas de prueba
+
+- **Superusuario:** `SUPERUSER_EMAIL` / `SUPERUSER_PASSWORD`. Con Docker son los del `.env` de la carpeta padre (`docker compose exec backend printenv SUPERUSER_EMAIL SUPERUSER_PASSWORD`). Se crea con `docker compose exec backend node scripts/seed-superuser.js`.
+- **Administrador:** lo crea el superusuario desde **Gobernanza**.
+- **Cliente:** esta app no tiene pantalla de registro. Créalo en el backend con `POST /auth/register` (desde Swagger en <http://localhost:8082> o con curl):
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"cliente.prueba@test.com","password":"Cliente1234","firstName":"Cliente","lastName":"Prueba"}'
+```
+
+Para tener productos que comprar: `docker compose exec backend node scripts/seed-catalog.js` (8 productos y los cupones `BIENVENIDA10` y `MONITORES50`).
+
+### Compra como cliente
+
+1. Abre <http://localhost:8081> e inicia sesión con el cliente: llegas a **Mi panel**.
+2. **Ir a la tienda** → elige un producto → **Agregar al Carrito** → **Ir al carrito**.
+3. Ajusta cantidades y pulsa **Proceder al pago**.
+4. Opcional: aplica un cupón. Elige el método y pulsa **Confirmar pedido**:
+   - **Pago contra entrega:** nombre, correo, teléfono y dirección obligatorios.
+   - **Tarjeta:** se tokeniza en el navegador (pasarela simulada); el número y el CVV nunca se envían.
+   - **Transferencia bancaria:** datos y comprobante (URL https). Queda pendiente hasta que un admin la apruebe.
+5. Verás **Pedido registrado** con el número de orden (`ORD-…`).
+
+### Ver la venta en las métricas
+
+Cierra sesión, entra como superusuario o administrador y abre **Panel Admin → Resumen y conciliación** (o **Reportes**). La compra aparece en ventas totales, pedidos, ticket promedio, unidades vendidas y desglose por método de pago. Las transferencias solo suman cuando se aprueban en la cola de conciliación.
+
+### Si algo falla
+
+| Síntoma | Qué revisar |
+|---|---|
+| "No hay conexion con el servidor" al confirmar el pedido | El backend debe permitir la cabecera `Idempotency-Key` en CORS y tener `http://localhost:8081` en `CORS_ORIGINS`. Reconstruye: `docker compose up -d --build backend`. |
+| El login rechaza al superusuario | Usa la contraseña del `.env` de la carpeta padre (la de Docker), no la del `.env` del backend; si no existe, ejecuta `seed-superuser` en el contenedor. |
+| "Hay productos sin retiro en tienda" | Llena la dirección de envío aunque pagues con tarjeta o transferencia. |
+| "La tienda esta en mantenimiento" | El superusuario activó el modo mantenimiento en Gobernanza. |
 
 ---
 
@@ -356,6 +404,8 @@ El frontend no tiene tablas ni modelos persistentes. Consume las siguientes form
 | Token de tarjeta | `{ paymentToken, last4, cardHolderName, cardBrand }` generado localmente por `paymentTokenizer`. |
 
 ## Documentación de la API
+
+La referencia completa e interactiva de la API (Swagger UI) está en <http://localhost:8082> al levantar el `docker-compose.yml`; la especificación OpenAPI se publica en `http://localhost:3000/api/v1/docs/openapi.json` y se mantiene en el [repositorio del backend](https://github.com/Joguisam-gt/ecommerce-backend#documentacion-interactiva-swagger).
 
 El frontend consume la API bajo `API_BASE_URL` (`http://localhost:3000/api/v1` por defecto). Endpoints usados por cada servicio:
 
