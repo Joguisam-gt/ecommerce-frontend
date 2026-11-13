@@ -1,7 +1,7 @@
 /**
  * Encabezado global responsivo: nombre de la tienda (vuelve a Store), etiqueta del
- * rol y acciones segun el rol (Carrito y Mi panel para user, Panel Admin, Panel
- * Superusuario, Iniciar o Cerrar sesion). En movil se compacta en dos filas.
+ * rol y acciones segun el rol (Carrito y Mi panel para user, Panel Admin para admin
+ * y superuser, Gobernanza solo para superuser, Iniciar o Cerrar sesion). En movil se compacta en dos filas.
  */
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -70,13 +70,12 @@ export function AppHeader() {
       <HeaderAction key="dashboard" label="Mi panel" onPress={() => go(ROUTES.USER_DASHBOARD)} />,
     );
   }
-  if (role === ROLES.ADMIN) {
+  // Panel Admin para admin y superuser; Gobernanza solo para superuser.
+  if (role === ROLES.ADMIN || role === ROLES.SUPERUSER) {
     actions.push(<HeaderAction key="admin" label="Panel Admin" onPress={() => go(ROUTES.ADMIN_PANEL)} />);
   }
   if (role === ROLES.SUPERUSER) {
-    actions.push(
-      <HeaderAction key="superuser" label="Panel Superusuario" onPress={() => go(ROUTES.SUPERUSER_PANEL)} />,
-    );
+    actions.push(<HeaderAction key="superuser" label="Gobernanza" onPress={() => go(ROUTES.SUPERUSER_PANEL)} />);
   }
   actions.push(
     isAuthenticated ? (
