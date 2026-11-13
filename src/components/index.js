@@ -16,3 +16,15 @@ export { EmptyState } from './EmptyState';
 export { SectionTitle } from './SectionTitle';
 export { QuantitySelector } from './QuantitySelector';
 export { SegmentedControl } from './SegmentedControl';
+// Parte B: componentes del panel de administracion y superusuario.
+export { DataTable } from './DataTable';
+export { FilterBar } from './FilterBar';
+export { AdminPage } from './AdminPage';
+export { KpiCard } from './KpiCard';
+export { StatusBadge, statusLabel, statusTone, STATUS_LABELS } from './StatusBadge';
+export { DetailRow } from './DetailRow';
+export { ConfirmModal } from './ConfirmModal';
+export { Checkbox } from './Checkbox';
+export { DateField, isValidIsoDate, dateFieldError } from './DateField';
+export { BarChart } from './BarChart';
+export { TabBar } from './TabBar';
